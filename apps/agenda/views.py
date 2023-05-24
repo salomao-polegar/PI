@@ -1,7 +1,6 @@
 from django.shortcuts import render, redirect
 from .models import *
 from datetime import datetime, timedelta, time
-from django.utils import timezone
 import pandas as pd
 
 HORARIOFUNCIONAMENTO = [
@@ -15,8 +14,8 @@ DIASABERTOS = [
 
 def definir_intervalos(minutos):
     horariosDisponiveis = []                
-    horarioInicial = DIASABERTOS[0][0].replace(hour=HORARIOFUNCIONAMENTO[0][0].hour, minute=HORARIOFUNCIONAMENTO[0][0].minute)
-    horarioFinal = DIASABERTOS[0][1].replace(hour=HORARIOFUNCIONAMENTO[0][1].hour, minute=HORARIOFUNCIONAMENTO[0][1].minute)
+    horarioInicial = DIASABERTOS[0][0].replace(hour=HORARIOFUNCIONAMENTO[0][0].hour, minute=HORARIOFUNCIONAMENTO[0][0].minute, second=0)
+    horarioFinal = DIASABERTOS[0][1].replace(hour=HORARIOFUNCIONAMENTO[0][1].hour, minute=HORARIOFUNCIONAMENTO[0][1].minute, second=0)
     # percorrendo dias
     while datetime(horarioInicial.year, horarioInicial.month, horarioInicial.day) <= datetime(horarioFinal.year, horarioFinal.month, horarioFinal.day):
 
@@ -24,39 +23,44 @@ def definir_intervalos(minutos):
         while time(horarioInicial.hour, horarioInicial.minute) <= time(horarioFinal.hour, horarioFinal.minute):
             
             # TODO filtrar horários já utilizados na agenda
+            if horarioInicial >= datetime.now():
+                
 
-
-            horariosDisponiveis.append([int(horarioInicial.timestamp()),
-                str(horarioInicial.day).zfill(2)+ 
-                "/"+
-                str(horarioInicial.month).zfill(2)+ 
-                "/"+
-                str(horarioInicial.year).zfill(2)+ 
-                " "+
-                str(horarioInicial.hour).zfill(2)+ 
-                ":"+
-                str(horarioInicial.minute).zfill(2)
-                ])
+                horariosDisponiveis.append([int(horarioInicial.timestamp()),
+                    str(horarioInicial.day).zfill(2)+ 
+                    "/"+
+                    str(horarioInicial.month).zfill(2)+ 
+                    "/"+
+                    str(horarioInicial.year).zfill(2)+ 
+                    " "+
+                    str(horarioInicial.hour).zfill(2)+ 
+                    ":"+
+                    str(horarioInicial.minute).zfill(2)
+                    ])
             horarioInicial += timedelta(minutes=minutos)
         horarioInicial+=timedelta(days=1)
         horarioInicial=horarioInicial.replace(hour=HORARIOFUNCIONAMENTO[0][0].hour, minute=HORARIOFUNCIONAMENTO[0][0].minute)
 
-    #print(horariosDisponiveis)
+    agenda = Agenda.objects.filter(horario__gte=datetime.now())
+    if agenda:
+        horarios_df = pd.DataFrame(horariosDisponiveis, columns=['timestamp', 'data'])    
+        agenda_df = pd.DataFrame(agenda.values())
+        agenda_df['horarioTimestamp'] = agenda_df['horario'].apply(lambda x: 
+                                                                int(datetime(year=x.year,
+                                                                            month=x.month,
+                                                                            day=x.day,
+                                                                            hour=x.hour,
+                                                                            minute=x.minute,
+                                                                            second=0).timestamp()))                                                               
 
-    # agenda = Agenda.objects.filter(horario__gte=timezone.now())
-    # print(pd.DataFrame(agenda.values()))
-    # horariosDisponiveis2 = []
-    # for i in agenda:
-    #     print(i.horario)
-    #     print(i.servico.duracao)
+        horarios_atualizados = horarios_df[~horarios_df['timestamp'].astype(str).isin(agenda_df['horarioTimestamp'].astype(str))]
+        horarios_atualizados=horarios_atualizados[horarios_atualizados['timestamp'] > datetime.now().timestamp()].values.tolist()
+        
+        
+    else:
+        horarios_atualizados=horariosDisponiveis
 
-    #     for j in horariosDisponiveis:
-    #         if j[0] >= i.horario.timestamp() and j[0] <= (i.horario+timedelta(hours=i.servico.duracao.hour,minutes=i.servico.duracao.minute)).timestamp():
-    #             print(datetime.fromtimestamp(j[0]))
-    #         else:
-    #             horariosDisponiveis2.append(j)
-    #     horariosDisponiveis = horariosDisponiveis2
-    return horariosDisponiveis
+    return horarios_atualizados
 
 
 
@@ -66,7 +70,7 @@ def index(request):
     
     context = {
         'servicos' : Servico.objects.all(),
-        'horarios' : definir_intervalos(15),
+        'horarios' : definir_intervalos(30),
         'formaPagamento' : FormasDePagamento.objects.all()
     }
 
@@ -82,14 +86,18 @@ def index(request):
     formaPagamento = request.POST.get('formaPagamento', None)
     cliente, _ = Cliente.objects.get_or_create(nome=nomeAgenda, celular=telefoneAgenda)
 
-    agendaCriada = Agenda.objects.create(
+    agendaCriada, _ = Agenda.objects.get_or_create(
         servico = Servico.objects.get(pk=servicoAgenda),
         cliente = cliente,
-        horario = datetime.fromtimestamp(int(horarioAgenda)),
+        horario = datetime.fromtimestamp(int(horarioAgenda)).replace(second=0),
         formaPagamento = FormasDePagamento.objects.get(pk=formaPagamento)
         )
     agendaCriada.save()
-
+    context = {
+        'servicos' : Servico.objects.all(),
+        'horarios' : definir_intervalos(30),
+        'formaPagamento' : FormasDePagamento.objects.all()
+    }
     context['agendaCriada'] = agendaCriada
 
     return render(request, "agenda/index.html", context=context)    

@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils.timezone import   localtime
 
 # class Loja (models.Model):
 #     nome = models.TextField(max_length=50)
@@ -36,8 +37,8 @@ class TipoServico (models.Model):
     tipo = models.TextField(max_length=50)
     descricao = models.TextField(max_length=500)
     
-#     def __str__(self):
-#         return self.tipo
+    def __str__(self):
+        return self.tipo
 
     
 class Servico (models.Model):
@@ -80,12 +81,11 @@ class Cliente(models.Model):
 class Agenda(models.Model):    
     servico = models.ForeignKey(Servico, on_delete=models.CASCADE)
     cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE)
-    horario = models.DateTimeField()
+    horario = models.DateTimeField(unique=True)
     formaPagamento = models.ForeignKey(FormasDePagamento, on_delete=models.CASCADE)
     #profissional = models.ForeignKey(Profissional, on_delete=models.CASCADE, default=None)
-
     def __str__(self):
-        return str(self.horario) + ' | ' + self.cliente.nome + ' | ' + self.servico.servico
+        return str(localtime(self.horario).strftime('%d de %b de %Y')) + ' | ' + self.cliente.nome + ' | ' + self.servico.servico
     
 
 class FotosServico(models.Model):
