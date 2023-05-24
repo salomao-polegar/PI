@@ -41,7 +41,6 @@ INSTALLED_APPS = [
     
     'agenda',
     'lojista',
-    #'usuario',
 
     'django_extensions',
     

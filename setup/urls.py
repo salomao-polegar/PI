@@ -20,5 +20,4 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('agenda.urls')),
     path('lojista/', include('lojista.urls')),
-    path('usuario/', include('usuario.urls')),
 ]
